@@ -5,3 +5,4 @@
 - Install current Reshade build
 - Drag everything into your Shaders folder
 - Do the same for https://github.com/JakobPCoder/ReshadeMotionEstimation
+- Order in reshade should be FXAA/SMAA -> DRME -> TFAA -> EVERYTHING ELSE
