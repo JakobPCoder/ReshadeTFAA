@@ -6,7 +6,7 @@
  - https://creativecommons.org/licenses/by-nc/4.0/legalcode
  
 # Human-readable summary of the License
-- NOT a substitute for https://creativecommons.org/licenses/by-nc/4.0/legalcode:
+- NOT a substitute for https://creativecommons.org/licenses/by-nc/4.0/legalcode
 
 ## You are free to:
 - Share — copy and redistribute the material in any medium or format
