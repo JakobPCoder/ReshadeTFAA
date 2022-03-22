@@ -4,3 +4,4 @@
 # INFO
 - Install current Reshade build
 - Drag everything into your Shaders folder
+- Do the same for https://github.com/JakobPCoder/ReshadeMotionEstimation
