@@ -203,7 +203,7 @@ float4 sampleHistory(sampler2D historySampler, float2 texcoord)
 
 
 //Passes
-float4 SaveCurPS(float4 position : SV_Position, float4 texcoord : TEXCOORD, out float4 last : SV_Target1, out float4 lastExpOut : SV_Target2) : SV_Target0
+float4 SaveCurPS(float4 position : SV_Position, float2 texcoord : TEXCOORD/*, out float4 last : SV_Target1, out float4 lastExpOut : SV_Target2*/) : SV_Target0
 {	
 	return float4(tex2D(smpInCur, texcoord).rgb, ReShade::GetLinearizedDepth(texcoord));
 }
@@ -286,7 +286,7 @@ float4 TaaPass(float4 position : SV_Position, float2 texcoord : TEXCOORD ) : SV_
 		finalMax = (nCrossMax + boxMax) * 0.5;
 
 		//sample Motion with closest Depth
-		sampledMotion = sampleMotion(texcoord + (neigborhood[closestDepthIndex] * sampleDist));
+		sampledMotion = sampleMotion(texcoord + (neigborhood[closestDepthIndex].xy * sampleDist));
 
 	}
 	//Cross
@@ -300,7 +300,7 @@ float4 TaaPass(float4 position : SV_Position, float2 texcoord : TEXCOORD ) : SV_
 	}
 
 	if(closestDepthIndex != -1)
-		sampledMotion = sampleMotion(texcoord + (neigborhood[closestDepthIndex] * sampleDist));
+		sampledMotion = sampleMotion(texcoord + (neigborhood[closestDepthIndex].xy * sampleDist));
 
 	//get fps factor
 	float fpsFix = frametime / (1000.0 / 48.0);
@@ -320,8 +320,8 @@ float4 TaaPass(float4 position : SV_Position, float2 texcoord : TEXCOORD ) : SV_
 
 
 	// Smooth minimum distance to signal limit divided by smooth max.
-	float3 rcpMRGB = rcp(finalMax);
-	float3 ampRGB = saturate(min(finalMin, 2.0 - finalMax) * rcpMRGB);	
+	float3 rcpMRGB = rcp(finalMax).xyz;
+	float3 ampRGB = saturate(min(finalMin.xyz, 2.0 - finalMax.xyz) * rcpMRGB);	
 	
 	// Shaping amount of sharpening.
 	ampRGB = rsqrt(ampRGB);
@@ -335,7 +335,7 @@ float4 TaaPass(float4 position : SV_Position, float2 texcoord : TEXCOORD ) : SV_
 	//						  0 w 0
 	//  Filter shape:		   w 1 w
 	//						  0 w 0  
-	float3 window = (neigborhood[0] + neigborhood[1]) + (neigborhood[2] + neigborhood[3]);
+	float3 window = (neigborhood[0].xyz + neigborhood[1].xyz) + (neigborhood[2].xyz + neigborhood[3].xyz);
 	float3 outColor = saturate((window * wRGB + colorCur) * rcpWeightRGB);
 	float3 sharpened = lerp(colorCur, outColor, sharpAmount);
 
@@ -425,3 +425,4 @@ technique TFAA
 		PixelShader = OutPS;
 	}
 }
+
