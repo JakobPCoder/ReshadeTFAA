@@ -203,7 +203,7 @@ float4 sampleHistory(sampler2D historySampler, float2 texcoord)
 
 
 //Passes
-float4 SaveCurPS(float4 position : SV_Position, float4 texcoord : TEXCOORD, out float4 last : SV_Target1, out float4 lastExpOut : SV_Target2) : SV_Target0
+float4 SaveCurPS(float4 position : SV_Position, float2 texcoord : TEXCOORD, out float4 last : SV_Target1, out float4 lastExpOut : SV_Target2) : SV_Target0
 {	
 	return float4(tex2D(smpInCur, texcoord).rgb, ReShade::GetLinearizedDepth(texcoord));
 }
