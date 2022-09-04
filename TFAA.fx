@@ -49,7 +49,7 @@
 
 
 #include "ReShadeUI.fxh"
-#include "MotionVectors.fxh"
+#include "ReShade.fxh"
 #include "TFAAUI.fxh"
 
 
@@ -72,6 +72,16 @@ sampler smpInCurBackup { Texture = texInCurBackup; AddressU = Clamp; AddressV = 
 sampler smpExpColor { Texture = texExpColor; AddressU = Clamp; AddressV = Clamp; MipFilter = Linear; MinFilter = Linear; MagFilter = Linear; };
 sampler smpExpColorBackup { Texture = texExpColorBackup; AddressU = Clamp; AddressV = Clamp; MipFilter = Linear; MinFilter = Linear; MagFilter = Linear; };
 
+
+//Motion Vectors
+texture texMotionVectors < pooled = false; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RG16F; };
+sampler SamplerMotionVectors { Texture = texMotionVectors; AddressU = Clamp; AddressV = Clamp; MipFilter = Point; MinFilter = Point; MagFilter = Point; };
+
+//Easy way to sample the velocity buffer
+float2 sampleMotion(float2 texcoord)
+{
+    return tex2D(SamplerMotionVectors, texcoord).rg;
+}
 
 
 //  Helper Functions
