@@ -39,12 +39,12 @@ uniform int framecount < source = "framecount"; >;
 // Shader
 //Textures
 texture texInCur : COLOR;
-texture texInCurBackup < pooled = false; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8; };
+texture texInCurBackup < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8; };
 
-texture texExpColor < pooled = false; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F; };
-texture texExpColorBackup < pooled = false; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F; };
+texture texExpColor < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F; };
+texture texExpColorBackup < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F; };
 
-texture texDepthBackup < pooled = false; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R16f; };
+texture texDepthBackup < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R16f; };
 
 //Samplers
 sampler smpInCur { Texture = texInCur; AddressU = Clamp; AddressV = Clamp; MipFilter = Linear; MinFilter = Linear; MagFilter = Linear; };
@@ -133,7 +133,7 @@ float3 cvtWhatever2Rgb(float3 whatever)
 	}
 }
 
-// History resampling
+// History resampling, could not track down who wrote this code comes from, but thanks to who ever did it first
 float4 sampleBicubic(sampler2D source, float2 texcoord)
 {
 	float2 texSize = tex2Dsize(source);
