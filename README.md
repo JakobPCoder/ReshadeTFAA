@@ -5,7 +5,7 @@
 # Copyright Notice
  - Temporal Filter Anti Aliasing | TFAA
  - First published 2022 - Copyright, Jakob Wapenhensch
- - Lincense File [HERE](LICENSE)
+ - License File [HERE](LICENSE)
  - https://creativecommons.org/licenses/by-nc/4.0/
  - https://creativecommons.org/licenses/by-nc/4.0/legalcode
   
