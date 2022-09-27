@@ -10,12 +10,17 @@
  - https://creativecommons.org/licenses/by-nc/4.0/legalcode
   
 # Updates
-- 0.1 Initial release, a lot of stuff broken or not working at all
-- 0.2 Finished implementig features present in the UI but did nothing at all in 0.1 and fixed a lot of bugs
+- 0.1 
+  - Initial release, a lot of stuff broken or not working at all
+- 0.2 
+  - Variance Clamping was implemented
+  - Finished implementig features present in the UI but did nothing at all in 0.1
+  - Fixed a lot of bugs.
+  - Optimized some stuff.
 
 # Installation
 - Install current Reshade build
 - Drag everything into your Shaders folder
 - Do the same for https://github.com/JakobPCoder/ReshadeMotionEstimation
-- Order in reshade should be FXAA OR! SMAA -> DRME -> TFAA -> EVERYTHING ELSE
+- Order in reshade should be (FXAA or! SMAA or! CMAA2) -> DRME -> TFAA -> EVERYTHING ELSE
 
