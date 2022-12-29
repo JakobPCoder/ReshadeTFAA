@@ -39,12 +39,12 @@ uniform int framecount < source = "framecount"; >;
 // Shader
 //Textures
 texture texInCur : COLOR;
-texture texInCurBackup < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8; };
+texture texInCurBackup < pooled = false; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8; };
 
-texture texExpColor < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F; };
-texture texExpColorBackup < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F; };
+texture texExpColor < pooled = false; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F; };
+texture texExpColorBackup < pooled = false; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F; };
 
-texture texDepthBackup < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R16f; };
+texture texDepthBackup < pooled = false; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R16f; };
 
 //Samplers
 sampler smpInCur { Texture = texInCur; AddressU = Clamp; AddressV = Clamp; MipFilter = Linear; MinFilter = Linear; MagFilter = Linear; };
@@ -220,8 +220,8 @@ float4 TaaPass(float4 position : SV_Position, float2 texcoord : TEXCOORD ) : SV_
 	//variables for variance clamping
 	float4 summedRGB = sampleCur;
 	float4 mean = 0;
-	float varMin = 1.0;
-	float varMax = 0.0;
+	float4 varMin;
+	float4 varMax;
 
 	//neigborhood sample offsets
 	static const float2 nOffsets[8] = { float2(0,1), float2(0,-1), float2(1,0), float2(-1,0),
@@ -360,13 +360,24 @@ float4 TaaPass(float4 position : SV_Position, float2 texcoord : TEXCOORD ) : SV_
 			clamped = clamp(cvtRgb2whatever(blendedColor.rgb), finalMin.rgb, finalMax.rgb);
 			break;
 		case 1:	//clamp var/sd
-			float var = cvtColorCur - mean;
-			[unroll] for (int i = 0; i < (UI_CLAMP_PATTERN == 0 ? 4 : 8); i++)
-				var += cvtRgb2whatever(neigborhood[i]) - mean;
-			float sd = sqrt(var);
-			varMin = mean - sd;
-			varMax = mean + sd;
-			clamped = clamp(cvtRgb2whatever(blendedColor.rgb), finalMin.rgb, finalMax.rgb);
+			float3 center = cvtRgb2whatever(blendedColor.rgb);
+			float3 M1 = center;
+			float3 M2 = center * center;
+			float3 s;
+			int sampleCount = UI_CLAMP_PATTERN ? 8 : 4;
+			[unroll] for (int i = 0; i < sampleCount; i++)
+			{
+				s = cvtRgb2whatever(neigborhood[i].rgb);
+				M1 += s;
+				M2 += s*s;
+			}
+			sampleCount++;
+			M1 /= sampleCount; M2 /= sampleCount;
+			M1 *= M1;
+			float3 sd = sqrt(abs(M1 - M2));
+			varMin = cvtColorCur.rgb - sd;
+			varMax = cvtColorCur.rgb + sd;
+			clamped = clamp(cvtRgb2whatever(blendedColor.rgb), varMin.rgb, varMax.rgb);
 			break;
 		default:
 			clamped = blendedColor;
