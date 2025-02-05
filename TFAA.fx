@@ -1,158 +1,178 @@
-
-
-
-/** 
- * - Temporal Filter Anti Aliasing | TFAA
- * - First published 2022 - Copyright, Jakob Wapenhensch
- * - https://creativecommons.org/licenses/by-nc/4.0/
- * - https://creativecommons.org/licenses/by-nc/4.0/legalcode
- */
-
- 
-/*
-	# Human-readable summary of the License and not a substitute for https://creativecommons.org/licenses/by-nc/4.0/legalcode:
-
-	You are free to:
-	- Share — copy and redistribute the material in any medium or format
-	- Adapt — remix, transform, and build upon the material
-	- The licensor cannot revoke these freedoms as long as you follow the license terms.
-
-	Under the following terms:
-	- Attribution — You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
-	- NonCommercial — You may not use the material for commercial purposes.
-	- No additional restrictions — You may not apply legal terms or technological measures that legally restrict others from doing anything the license permits.
-
-	Notices:
-	- You do not have to comply with the license for elements of the material in the public domain or where your use is permitted by an applicable exception or limitation.
-	- No warranties are given. The license may not give you all of the permissions necessary for your intended use. For example, other rights such as publicity, privacy, or moral rights may limit how you use the material.
-*/
-
-
 /*=============================================================================
-	Includes
+    TFAA (2.0)
+    Temporal Filter Anti-Aliasing Shader
+    First published 2025 - Copyright, Jakob Wapenhensch
+    License: CC BY-NC 4.0 (https://creativecommons.org/licenses/by-nc/4.0/)
+    https://creativecommons.org/licenses/by-nc/4.0/legalcode
 =============================================================================*/
 
 #include "ReShadeUI.fxh"
-#include "ReShade.fxh"
-
 
 /*=============================================================================
-	Preprocessor settings
+    Preprocessor Settings
 =============================================================================*/
 
-#ifndef USE_LAUNCHPAD
- #define USE_LAUNCHPAD 	0		// 0 -> Use my own motion estimation shader   1 - > use martys Launchpad shader
-#endif
-
-#ifndef UI_USE_CUBIC_HISTORY
- #define UI_USE_CUBIC_HISTORY 	1		// 0 -> Use Bilinear Sampling - Blury -   1 -> Use Cubic History Sampling - Sharper -  (Default)
-#endif
-
-
-// Uniform variables to store frame time and frame count
+// Uniform variable to access the frame time.
 uniform float frametime < source = "frametime"; >;
-uniform int framecount < source = "framecount"; >;
 
-// Constant to compute FPS; 48 frames are expected per 1000 milliseconds
+// Constant for temporal weights adjustment based on a 48 FPS baseline.
 static const float fpsConst = (1000.0 / 48.0);
 
+
 /*=============================================================================
-	UI Uniforms
+    UI Uniforms
 =============================================================================*/
 
-uniform float  UI_TEMPORAL_FILTER_STRENGTH <
-	ui_type = "slider";
-	ui_min = 0.0; ui_max = 1.0; ui_step = 0.01;
-	ui_label = "Temporal Filter Strength";
-	ui_category = "Temporal Filter";
-	ui_tooltip = "";
+/**
+ * @brief Slider controlling the strength of the temporal filter.
+ */
+uniform float UI_TEMPORAL_FILTER_STRENGTH <
+    ui_type    = "slider";
+    ui_min     = 0.0; 
+    ui_max     = 1.0; 
+    ui_step    = 0.01;
+    ui_label   = "Temporal Filter Strength";
+    ui_category= "Temporal Filter";
+    ui_tooltip = "";
+> = 0.5;
+
+/**
+ * @brief Slider controlling the amount of adaptive sharpening.
+ */
+uniform float UI_POST_SHARPEN <
+    ui_type    = "slider";
+    ui_min     = 0.0; 
+    ui_max     = 1.0; 
+    ui_step    = 0.01;
+    ui_label   = "Adaptive Sharpening";
+    ui_category= "Temporal Filter";
+    ui_tooltip = "";
 > = 0.5;
 
 
-
-
 /*=============================================================================
-	Textures & Samplers
+    Textures & Samplers
 =============================================================================*/
 
-// Textures and their corresponding samplers
+// Texture and sampler for depth input.
 texture texDepthIn : DEPTH;
-sampler smpDepthIn { Texture = texDepthIn; };
+sampler smpDepthIn { 
+    Texture = texDepthIn; 
+};
 
-// Texture and sampler for the current frame's color
+// Texture and sampler for the current frame's color.
 texture texInCur : COLOR;
-sampler smpInCur { Texture = texInCur; AddressU = Clamp; AddressV = Clamp; MipFilter = Linear; MinFilter = Linear; MagFilter = Linear; };
+sampler smpInCur { 
+    Texture   = texInCur; 
+    AddressU  = Clamp; 
+    AddressV  = Clamp; 
+    MipFilter = Linear; 
+    MinFilter = Linear; 
+    MagFilter = Linear; 
+};
 
-// Backup texture for the current frame's color
-texture texInCurBackup < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA8; };
-sampler smpInCurBackup { Texture = texInCurBackup; AddressU = Clamp; AddressV = Clamp; MipFilter = Linear; MinFilter = Linear; MagFilter = Linear; };
+// Backup texture for the current frame's color.
+texture texInCurBackup < pooled = true; > { 
+    Width   = BUFFER_WIDTH; 
+    Height  = BUFFER_HEIGHT; 
+    Format  = RGBA8; 
+};
 
-// Textures to store Exponential frame Buffer
-texture texExpColor < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F; };
-texture texExpColorBackup < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RGBA16F; };
-sampler smpExpColor { Texture = texExpColor; AddressU = Clamp; AddressV = Clamp; MipFilter = Linear; MinFilter = Linear; MagFilter = Linear; };
-sampler smpExpColorBackup { Texture = texExpColorBackup; AddressU = Clamp; AddressV = Clamp; MipFilter = Linear; MinFilter = Linear; MagFilter = Linear; };
+sampler smpInCurBackup { 
+    Texture   = texInCurBackup; 
+    AddressU  = Clamp; 
+    AddressV  = Clamp; 
+    MipFilter = Linear; 
+    MinFilter = Linear; 
+    MagFilter = Linear; 
+};
 
-// Backup texture to store depth information
-texture texDepthBackup < pooled = true; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = R16f; };
-sampler smpDepthBackup { Texture = texDepthBackup; AddressU = Clamp; AddressV = Clamp; MipFilter = Point; MinFilter = Point; MagFilter = Point; };
+// Texture for storing the exponential frame buffer.
+texture texExpColor < pooled = true; > { 
+    Width   = BUFFER_WIDTH; 
+    Height  = BUFFER_HEIGHT; 
+    Format  = RGBA16F; 
+};
 
-// Motion Vectors Selection
-#if USE_LAUNCHPAD == 0
+sampler smpExpColor { 
+    Texture   = texExpColor; 
+    AddressU  = Clamp; 
+    AddressV  = Clamp; 
+    MipFilter = Linear; 
+    MinFilter = Linear; 
+    MagFilter = Linear; 
+};
 
-	// Texture to store motion vectors
-	texture texMotionVectors < pooled = false; > { Width = BUFFER_WIDTH; Height = BUFFER_HEIGHT; Format = RG16F; };
-	sampler SamplerMotionVectors { Texture = texMotionVectors; AddressU = Clamp; AddressV = Clamp; MipFilter = Point; MinFilter = Point; MagFilter = Point; };
+// Backup texture for the exponential frame buffer.
+texture texExpColorBackup < pooled = true; > { 
+    Width   = BUFFER_WIDTH; 
+    Height  = BUFFER_HEIGHT; 
+    Format  = RGBA16F; 
+};
 
-	/**
-	 * Function to sample motion vectors.
-	 * 
-	 * @param texcoord The texture coordinates.
-	 * @return The RG components representing motion vectors.
-	 */
-	float2 sampleMotion(float2 texcoord)
-	{
-		return tex2D(SamplerMotionVectors, texcoord).rg;
-	}
+sampler smpExpColorBackup { 
+    Texture   = texExpColorBackup; 
+    AddressU  = Clamp; 
+    AddressV  = Clamp; 
+    MipFilter = Linear; 
+    MinFilter = Linear; 
+    MagFilter = Linear; 
+};
 
-#else
+// Backup texture for the last frame's depth.
+texture texDepthBackup < pooled = true; > { 
+    Width   = BUFFER_WIDTH; 
+    Height  = BUFFER_HEIGHT; 
+    Format  = R16f; 
+};
 
-	namespace Deferred 
-	{
-		texture MotionVectorsTex        { Width = BUFFER_WIDTH;   Height = BUFFER_HEIGHT;   Format = RG16F;     };
-	}
-	sampler SamplerMartysMotionVectors { Texture = Deferred::MotionVectorsTex; AddressU = Clamp; AddressV = Clamp; MipFilter = Point; MinFilter = Point; MagFilter = Point; };
-
-	/**
-	 * Function to sample Marty's motion vectors.
-	 * 
-	 * @param texcoord The texture coordinates.
-	 * @return The RG components representing motion vectors.
-	 */
-	float2 sampleMotion(float2 texcoord)
-	{
-		return tex2D(SamplerMartysMotionVectors, texcoord).rg;
-	}
-	
-#endif
-
-
+sampler smpDepthBackup { 
+    Texture   = texDepthBackup; 
+    AddressU  = Clamp; 
+    AddressV  = Clamp; 
+    MipFilter = Point; 
+    MinFilter = Point; 
+    MagFilter = Point; 
+};
 
 /*=============================================================================
-	Functions
+    Functions
 =============================================================================*/
 
-//YCbCr
-//with permissions from https://github.com/BlueSkyDefender/AstrayFX
+/**
+ * @brief Samples a texture at a specified UV coordinate and mip level.
+ *
+ * @param s     Sampler reference of the texture.
+ * @param uv    UV coordinate in texture space.
+ * @param mip   Mip level to sample.
+ * @return      The texture sample as a float4.
+ */
+float4 tex2Dlod(sampler s, float2 uv, float mip)
+{
+    return tex2Dlod(s, float4(uv, 0, mip));
+}
+
+/**
+ * @brief Converts an RGB color to the YCbCr color space.
+ *
+ * @param rgb   Input RGB color.
+ * @return      Corresponding color in YCbCr space (float3).
+ */
 float3 cvtRgb2YCbCr(float3 rgb)
 {
- 	float y = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
+    float y  = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
     float cb = (rgb.b - y) * 0.565;
     float cr = (rgb.r - y) * 0.713;
 
     return float3(y, cb, cr);
 }
 
+/**
+ * @brief Converts a YCbCr color to RGB color space.
+ *
+ * @param YCbCr Input color in YCbCr format.
+ * @return      Converted RGB color (float3).
+ */
 float3 cvtYCbCr2Rgb(float3 YCbCr)
 {
     return float3(
@@ -163,266 +183,401 @@ float3 cvtYCbCr2Rgb(float3 YCbCr)
 }
 
 /**
- * Color Conversion Wrapper for RGB to "whatever" color space.
- * This wrapper is employed because the YCbCr color space (as an example) produces sharper, better clamping results than RGB.
+ * @brief Wrapper function converting RGB to an intermediate color space.
+ *
+ * Acts as a pass-through to cvtRgb2YCbCr.
+ *
+ * @param rgb   Input RGB color.
+ * @return      Converted color in the intermediate space ("whatever" space).
  */
-
 float3 cvtRgb2whatever(float3 rgb)
 {
-	return cvtRgb2YCbCr(rgb);
+    return cvtRgb2YCbCr(rgb);
 }
-
-float3 cvtWhatever2Rgb(float3 whatever)
-{
-	return cvtYCbCr2Rgb(whatever);
-}
-
-
-
-// History resampling, could not track down who wrote this code comes from, but thanks to who ever did it first
-float4 sampleBicubic(sampler2D source, float2 texcoord)
-{
-	// Calculate the size of the source texture
-    float2 texSize = tex2Dsize(source);
-
-    // Calculate the position to sample in the source texture
-    float2 samplePos = texcoord * texSize;
-
-    // Calculate the integer and fractional parts of the sample position
-    float2 texPos1 = floor(samplePos - 0.5f) + 0.5f;
-    float2 f = samplePos - texPos1;
-
-    // Calculate the interpolation weights for the four cubic spline basis functions
-    float2 w0 = f * (-0.5f + f * (1.0f - 0.5f * f));
-    float2 w1 = 1.0f + f * f * (-2.5f + 1.5f * f);
-    float2 w2 = f * (0.5f + f * (2.0f - 1.5f * f));
-    float2 w3 = f * f * (-0.5f + 0.5f * f);
-
-    // Calculate weights for two intermediate values (used for more efficient sampling)
-    float2 w12 = w1 + w2;
-    float2 offset12 = w2 / (w1 + w2);
-
-    // Calculate the positions to sample for the eight texels involved in bicubic interpolation
-    float2 texPos0 = texPos1 - 1;
-    float2 texPos3 = texPos1 + 2;
-    float2 texPos12 = texPos1 + offset12;
-
-    // Normalize the texel positions to the [0, 1] range
-    texPos0 /= texSize;
-    texPos3 /= texSize;
-    texPos12 /= texSize;
-
-    // Initialize the result color to zero
-    float4 result = 0.0f;
-
-    // Perform bicubic interpolation by sampling the source texture with the calculated weights
-    result += tex2D(source, float2(texPos0.x, texPos0.y)) * w0.x * w0.y;
-    result += tex2D(source, float2(texPos12.x, texPos0.y)) * w12.x * w0.y;
-    result += tex2D(source, float2(texPos3.x, texPos0.y)) * w3.x * w0.y;
-
-    result += tex2D(source, float2(texPos0.x, texPos12.y)) * w0.x * w12.y;
-    result += tex2D(source, float2(texPos12.x, texPos12.y)) * w12.x * w12.y;
-    result += tex2D(source, float2(texPos3.x, texPos12.y)) * w3.x * w12.y;
-
-    result += tex2D(source, float2(texPos0.x, texPos3.y)) * w0.x * w3.y;
-    result += tex2D(source, float2(texPos12.x, texPos3.y)) * w12.x * w3.y;
-    result += tex2D(source, float2(texPos3.x, texPos3.y)) * w3.x * w3.y;
-
-    return result;
-}
-
-
-//Sample Wrappers
 
 /**
- * Sample from the history texture.
+ * @brief Wrapper function converting the intermediate color space to RGB.
  *
- * @param historySampler The sampler2D object used to sample the history texture.
- * @param texcoord The texture coordinate.
- * @return The sampled color.
+ * Acts as a pass-through to cvtYCbCr2Rgb.
+ *
+ * @param whatever Input color in the intermediate ("whatever") space.
+ * @return         Converted RGB color.
+ */
+float3 cvtWhatever2Rgb(float3 whatever)
+{
+    return cvtYCbCr2Rgb(whatever);
+}
+
+/**
+ * @brief Performs bicubic interpolation using 5 sample points.
+ *
+ * Inspired by techniques from Marty, this function computes the filtered
+ * value by calculating sample weights and positions.
+ *
+ * @param source    Sampler reference of the texture.
+ * @param texcoord  Texture coordinate to be sampled.
+ * @return          Interpolated color as float4.
+ */
+float4 bicubic_5(sampler source, float2 texcoord)
+{
+    // Compute the texture size.
+    float2 texsize = tex2Dsize(source);
+
+    // Convert texture coordinate to texel space.
+    float2 UV = texcoord * texsize;
+
+    // Determine the center of the texel grid.
+    float2 tc = floor(UV - 0.5) + 0.5;
+
+    // Compute the fractional part for weighting.
+    float2 f = UV - tc;
+
+    // Calculate powers of f needed for weight computation.
+    float2 f2 = f * f;
+    float2 f3 = f2 * f;
+
+    // Compute weights for the neighboring texels.
+    float2 w0 = f2 - 0.5 * (f3 + f);
+    float2 w1 = 1.5 * f3 - 2.5 * f2 + 1.0;
+    float2 w3 = 0.5 * (f3 - f2);
+    float2 w12 = 1.0 - w0 - w3;
+
+    // Store sample weights and corresponding sample position offsets.
+    float4 ws[3];
+    ws[0].xy = w0;
+    ws[1].xy = w12;
+    ws[2].xy = w3;
+
+    // Calculate sample positions in texel space.
+    ws[0].zw = tc - 1.0;
+    ws[1].zw = tc + 1.0 - w1 / w12;
+    ws[2].zw = tc + 2.0;
+
+    // Normalize the sample offsets to texture coordinate space.
+    ws[0].zw /= texsize;
+    ws[1].zw /= texsize;
+    ws[2].zw /= texsize;
+
+    // Combine neighboring samples weighted by the computed factors.
+    float4 ret;
+    ret  = tex2Dlod(source, float2(ws[1].z, ws[0].w), 0) * ws[1].x * ws[0].y;
+    ret += tex2Dlod(source, float2(ws[0].z, ws[1].w), 0) * ws[0].x * ws[1].y;
+    ret += tex2Dlod(source, float2(ws[1].z, ws[1].w), 0) * ws[1].x * ws[1].y;
+    ret += tex2Dlod(source, float2(ws[2].z, ws[1].w), 0) * ws[2].x * ws[1].y;
+    ret += tex2Dlod(source, float2(ws[1].z, ws[2].w), 0) * ws[1].x * ws[2].y;
+    
+    // Normalize the result.
+    float normfact = 1.0 / (1.0 - (f.x - f2.x) * (f.y - f2.y) * 0.25);
+    return max(0, ret * normfact);
+}
+
+/**
+ * @brief Samples historical frame data using bicubic interpolation.
+ *
+ * Wraps the bicubic interpolation method to retrieve a filtered history value.
+ *
+ * @param historySampler Sampler for the history texture.
+ * @param texcoord       Texture coordinate.
+ * @return               Filtered historical sample as a float4.
  */
 float4 sampleHistory(sampler2D historySampler, float2 texcoord)
 {
-	#if UI_USE_CUBIC_HISTORY
-		// Use bicubic sampling if UI_USE_CUBIC_HISTORY is defined
-		return sampleBicubic(historySampler, texcoord);
-	#else
-		// Default to bilinear sampling
-		return tex2D(historySampler, texcoord);
-	#endif
+    return bicubic_5(historySampler, texcoord);
 }
 
 /**
- * Retrieve depth information from a 2D texture coordinate.
+ * @brief Retrieves and linearizes the depth value from the depth texture.
  *
- * @param texcoord The texture coordinate.
- * @return Depth value at the given coordinate.
+ * Converts the non-linear depth sample into a linear depth value and handles
+ * reversed depth input when enabled.
+ *
+ * @param texcoord Texture coordinate.
+ * @return         Linearized depth value.
  */
 float getDepth(float2 texcoord)
 {
-	// Sample depth from depth texture using Level of Detail (LOD) 0
-	float depth = tex2Dlod(smpDepthIn, float4(texcoord, 0, 0)).x;
+    // Sample raw depth.
+    float depth = tex2Dlod(smpDepthIn, texcoord, 0).x;
 
-	#if RESHADE_DEPTH_INPUT_IS_REVERSED
-		// Reverse depth value if RESHADE_DEPTH_INPUT_IS_REVERSED is defined
-		depth = 1.0 - depth;
-	#endif
+    #if RESHADE_DEPTH_INPUT_IS_REVERSED
+        // Adjust for reversed depth if required.
+        depth = 1.0 - depth;
+    #endif
 
-	return depth;
+    // Define a near plane constant.
+    const float N = 1.0;
+
+    // Linearize depth based on the far plane parameter.
+    depth /= RESHADE_DEPTH_LINEARIZATION_FAR_PLANE - depth * (RESHADE_DEPTH_LINEARIZATION_FAR_PLANE - N);
+
+    return depth;
 }
 
 
-//Passes
+/*=============================================================================
+    Motion Vector Imports
+=============================================================================*/
 
-float4 SaveCurPS(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target0
-{	
-	//write current color and depth into one texture for easy use later;
-	float depthOnly = getDepth(texcoord);
-	return float4(tex2D(smpInCur, texcoord).rgb, depthOnly);
-}
-
-
-float4 TaaPass(float4 position : SV_Position, float2 texcoord : TEXCOORD ) : SV_Target
+namespace Deferred 
 {
-	//sample local pixel color and depth
-	float4 sampleCur = tex2D(smpInCurBackup, texcoord);
-	float depthCur = sampleCur.a;
+    // Texture storing motion vectors (RGBA16F).
+    // XY: Delta UV; Z: Confidence; W: Depth.
+    texture MotionVectorsTex { 
+        Width  = BUFFER_WIDTH; 
+        Height = BUFFER_HEIGHT; 
+        Format = RG16F;
+    };
+    sampler sMotionVectorsTex { 
+        Texture = MotionVectorsTex; 
+    };
 
-	//local pixel from rgb to clamping format		
-	float4 cvtColorCur = float4(cvtRgb2whatever(sampleCur.rgb), depthCur);
-
-	//variables for storing min max values for clamping
-	float4 nCrossMin = cvtColorCur;
-	float4 nCrossMax = cvtColorCur;
-	float4 nCornersMin = cvtColorCur;
-	float4 nCornersMax = cvtColorCur;
-
-	//neigborhood sample offsets
-	static const float2 nOffsets[9] = { float2(0,  1), float2(0, -1), float2(1, 0), float2(-1, 0),
-										float2(-1,-1), float2(1, -1), float2(1, 1), float2(-1, 1), float2(0, 0) };
-	
-	//variables for storing neigborhood and closest depth for dilated motion vectors
-	float4 neigborhood[8];
-	int closestDepthIndex = 8; //defualt to (0, 0)
-	float closestDepth = 1.0;
-
-	for (int i = 0; i < 8; i++)
-	{
-		float4 nSample = tex2D(smpInCurBackup, texcoord + (nOffsets[i] * ReShade::PixelSize));
-		neigborhood[i] = nSample;
-
-		//find pixel for dilated motion vectors
-		if (nSample.a < closestDepth)
-		{
-			closestDepth = nSample.a;
-			closestDepthIndex = i;
-		}
-
-		//get min and max of neighborhood for clamping
-		float4 cvt = float4(cvtRgb2whatever(nSample.rgb), nSample.a);
-
-		if (i < 4)
-		{
-			nCrossMin = min(cvt, nCrossMin);
-			nCrossMax = max(cvt, nCrossMax);
-		}
-		else
-		{
-			nCornersMin = min(cvt, nCornersMin);
-			nCornersMax = max(cvt, nCornersMax);
-		}
-	}
-
-	//Rounded Box -> average of Box and Cross min max values -> close to properly weighted samples
-	float4 boxMin =  min(nCrossMin, nCornersMin);
-	float4 boxMax =  max(nCrossMax, nCornersMax);
-	float4 finalMin = (nCrossMin + boxMin) * 0.5;
-	float4 finalMax = (nCrossMax + boxMax) * 0.5;
-
-
-	//sample Motion with closest Depth
-	float2 sampledMotion = sampleMotion(texcoord + (nOffsets[closestDepthIndex] * ReShade::PixelSize));
-
-	//reprojection -> sample where local pixel was last
-	float2 lastSamplePos = texcoord + sampledMotion;
-	float4 sampleLast = sampleHistory(smpExpColorBackup, lastSamplePos);
-
-
-	//Blending weight calculation
-	//weight from menu
-	float weight = lerp(0.5, 0.99, UI_TEMPORAL_FILTER_STRENGTH);
-
-	//weight normalized to 48 hz test scenario 
-	float fpsFix = frametime / fpsConst;
-	weight = weight / fpsFix;
-
-	//use more of old frame when we are in a high contrast region
-	weight *= 0.5 + (saturate(length(finalMin.rgb - finalMax.rgb) * 10.0) * 0.5);
-
-	//when last and current sample are very similar, we just use the new one.
-	weight *= saturate(length(sampleLast.rgb - sampleCur.rgb) * 10);
-
-	//clamp weight in reasonable range
-	weight = clamp(weight, 0.5, 0.99);
-
-
-
-	//Gamma-corrected Interpolation: Better preserves perceived light intensity, 
-	float3 blendedColor = sqrt(lerp(sampleCur.rgb * sampleCur.rgb, sampleLast.rgb * sampleLast.rgb, weight));
-
-	//Color Clamping
-	float3 rgb = cvtWhatever2Rgb(clamp(cvtRgb2whatever(blendedColor), finalMin.rgb, finalMax.rgb));
-	
-	//how much we clamped this time
-	float clampDelta = length(blendedColor - rgb);
-
-	//if neighborhood has a bigger range, we expect more clamping so we keep the delta low for the next frame
-	float clampDeltaNormalized = clampDelta / (1.0 + (length(finalMin.rgb - finalMax.rgb) * 10));
-
-
-	//return color and clamp amount
-	return float4(rgb, clampDeltaNormalized);
+    /**
+     * @brief Retrieves the motion vector at a given texture coordinate.
+     *
+     * @param uv Texture coordinate.
+     * @return   Motion vector as a float2.
+     */
+    float2 get_motion(float2 uv)
+    {
+        return tex2Dlod(sMotionVectorsTex, uv, 0).xy;
+    }
 }
 
 
-void SaveResultsPS(float4 position : SV_Position, float2 texcoord : TEXCOORD, out float4 lastExpOut : SV_Target0, out float depthOnly : SV_Target1)
+/*=============================================================================
+    Shader Pass Functions
+=============================================================================*/
+
+/**
+ * @brief Saves the current frame's color and depth into a backup texture.
+ *
+ * Samples the scene's color and computes the linearized depth for use in
+ * later temporal filtering passes.
+ *
+ * @param position Unused screen-space position.
+ * @param texcoord Texture coordinate.
+ * @return         Color from the current frame with depth stored in the alpha channel.
+ */
+float4 SaveCur(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target0
 {
-	//save current depth and state of the exponential history for use in the next frame frame
-	lastExpOut = tex2D(smpExpColor, texcoord);
-	depthOnly = getDepth(texcoord);
+    // Retrieve and linearize depth.
+    float depthOnly = getDepth(texcoord);
+
+    // Sample current frame color and pack depth into alpha channel.
+    return float4(tex2Dlod(smpInCur, texcoord, 0).rgb, depthOnly);
 }
 
-float4 OutPS(float4 position : SV_Position, float2 texcoord : TEXCOORD ) : SV_Target
+/**
+ * @brief Applies the temporal filter for anti-aliasing.
+ *
+ * Blends the current frame with historical data based on motion vectors,
+ * local contrast, and depth continuity. This minimizes aliasing artifacts
+ * while also applying adaptive sharpening.
+ *
+ * Steps:
+ *   1. Sample the current frame's color and convert to an intermediate color space.
+ *   2. Gather a 3x3 neighborhood (with defined offsets) to compute local contrast bounds.
+ *   3. Retrieve the motion vector of the center pixel and compute the last sample position.
+ *   4. Sample historical data (both color and depth) from previous frames.
+ *   5. Calculate various factors: FPS correction, local contrast, motion speed, and disocclusion.
+ *   6. Compute a blending weight using UI parameters and these factors.
+ *   7. Clamp the historical sample within neighborhood bounds.
+ *   8. Blend current and historical colors and apply an adaptive sharpening term.
+ *
+ * @param position Unused screen-space position.
+
+ * @param texcoord Texture coordinate.
+ * @return         Processed color after temporal filtering.
+ */
+float4 TemporalFilter(float4 position : SV_Position, float2 texcoord : TEXCOORD) : SV_Target
 {
-	//show filtered image to screen
-	return tex2D(smpExpColor, texcoord);
+    // Sample current frame.
+    float4 sampleCur = tex2Dlod(smpInCurBackup, texcoord, 0);
+    float4 cvtColorCur = float4(cvtRgb2whatever(sampleCur.rgb), sampleCur.a);
+
+    // Offsets for a 3x3 neighborhood (center is at index 4).
+    static const float2 nOffsets[9] = { 
+		float2(-0.7,-0.7), float2(0, 1),  float2(0.7, 0.7), 
+        float2(-1, 0),     float2(0, 0),  float2(1, 0), 
+        float2(-0.7, 0.7), float2(0, -1), float2(0.7, 0.7) 
+	};
+
+    // Array to hold neighborhood samples.
+    float4 neighborhood[9];
+
+    // The center of the neighborhood (index 4) is assumed to have the closest depth.
+    int closestDepthIndex = 4;
+
+    // Initialize min/max conversion bounds for local contrast.
+    float4 minimumCvt = 2;
+    float4 maximumCvt = -1;
+
+    // Sample the neighborhood and update min/max color conversions.
+    for (int i = 0; i < 9; i++)
+    {
+        neighborhood[i] = tex2Dlod(smpInCurBackup, texcoord + (nOffsets[i] * ReShade::PixelSize), 0);
+        float4 cvt = float4(cvtRgb2whatever(neighborhood[i].rgb), neighborhood[i].a);
+
+        minimumCvt = min(minimumCvt, cvt);
+        maximumCvt = max(maximumCvt, cvt);
+    }
+
+    // Retrieve dilated motion vector.
+    float2 motion = Deferred::get_motion(texcoord + (nOffsets[closestDepthIndex] * ReShade::PixelSize));
+
+    // Compute the corresponding sample position from the previous frame.
+    float2 lastSamplePos = texcoord + motion;
+
+    // Sample historical depth and exponential color.
+    float lastDepth = tex2Dlod(smpDepthBackup, lastSamplePos, 0).r;
+    float4 sampleExp = saturate(sampleHistory(smpExpColorBackup, lastSamplePos));
+
+    // Compute temporal factors.
+    float fpsFix       = frametime / fpsConst;
+    float localContrast= saturate(pow(abs(maximumCvt.r - minimumCvt.r), 0.75));
+    float speed        = length(motion);
+    float speedFactor  = 1.0 - pow(saturate(speed * 20.0), 0.5);
+
+    // Calculate the depth difference and construct a mask for depth discontinuities. This is effectively a disocclusion mask.
+    float depthDelta = max(0, saturate(minimumCvt.a - lastDepth)) / sampleCur.a;
+    float depthMask  = saturate(1.0 - pow(depthDelta * 4, 4));
+
+    // Compute the blending weight.
+    float weight = lerp(0.50, 0.99, UI_TEMPORAL_FILTER_STRENGTH);
+    weight = lerp(weight, weight * (0.6 + localContrast * 2), 0.5);
+    weight  = clamp(weight * speedFactor * depthMask, 0.0, 0.95);
+
+    // Clamp the historical sample’s converted color within the computed neighborhood bounds.
+    float4 sampleExpClamped = float4(cvtWhatever2Rgb(clamp(cvtRgb2whatever(sampleExp.rgb), minimumCvt.rgb, maximumCvt.rgb)), sampleExp.a);
+
+    // Use a power-law blend with a correction factor.
+    const static float correctionFactor = 2;
+    float3 blendedColor = saturate(pow(lerp(pow(sampleCur.rgb, correctionFactor), pow(sampleExpClamped.rgb, correctionFactor), weight), (1.0 / correctionFactor)));
+
+    // Sharpening is influenced by local contrast and motion speed.
+    float sharp = (0.01 + localContrast) * (pow(speed, 0.3)) * 32;
+    sharp = saturate(((sharp + sampleExpClamped.a) * 0.5) * depthMask * UI_POST_SHARPEN * UI_TEMPORAL_FILTER_STRENGTH);
+
+    // Return the final blended color and sharpening factor.
+    return float4(blendedColor, sharp);
 }
 
-//Technique
+/**
+ * @brief Saves the post-processed exponential color and depth for history.
+ *
+ * This pass stores the final exponential color buffer and the corresponding
+ * linearized depth value for usage in subsequent frames.
+ *
+ * @param position    Unused screen-space position.
+ * @param texcoord    Texture coordinate.
+ * @param lastExpOut  Output exponential color buffer.
+ * @param depthOnly   Output linearized depth.
+ */
+void SavePost(float4 position : SV_Position, float2 texcoord : TEXCOORD, out float4 lastExpOut : SV_Target0, out float depthOnly : SV_Target1)
+{
+    // Store the current exponential color.
+    lastExpOut = tex2Dlod(smpExpColor, texcoord, 0);
+
+    // Store the corresponding linearized depth.
+    depthOnly = getDepth(texcoord);
+}
+
+/**
+ * @brief Final output pass that applies adaptive sharpening.
+ *
+ * Applies adaptive sharpening to the final image.
+ *
+ * @param position Unused screen-space position.
+ * @param texcoord Texture coordinate.
+ * @return         The final processed color with sharpening applied.
+ */
+float4 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD ) : SV_Target
+{
+    // ---------- Sample Center and Neighboring Pixels ----------
+    float4 center     = tex2Dlod(smpExpColor, texcoord, 0);
+    float4 top        = tex2Dlod(smpExpColor, texcoord + (float2(0, -1) * ReShade::PixelSize), 0);
+    float4 bottom     = tex2Dlod(smpExpColor, texcoord + (float2(0,  1) * ReShade::PixelSize), 0);
+    float4 left       = tex2Dlod(smpExpColor, texcoord + (float2(-1, 0) * ReShade::PixelSize), 0);
+    float4 right      = tex2Dlod(smpExpColor, texcoord + (float2(1,  0) * ReShade::PixelSize), 0);
+    float4 topLeft    = tex2Dlod(smpExpColor, texcoord + (float2(-0.7, -0.7) * ReShade::PixelSize), 0);
+    float4 topRight   = tex2Dlod(smpExpColor, texcoord + (float2(0.7,  -0.7) * ReShade::PixelSize), 0);
+    float4 bottomLeft = tex2Dlod(smpExpColor, texcoord + (float2(-0.7,  0.7) * ReShade::PixelSize), 0);
+    float4 bottomRight= tex2Dlod(smpExpColor, texcoord + (float2(0.7,   0.7) * ReShade::PixelSize), 0);
+
+    // Find the maximum and minimum among the sampled neighbors.
+    float4 maxBox = max(
+                      max(top,    max(bottom, max(left, max(right, center)))),
+                      max(topLeft, max(topRight, max(bottomLeft, bottomRight)))
+                    );
+    float4 minBox = min(
+                      min(top,    min(bottom, min(left, min(right, center)))),
+                      min(topLeft, min(topRight, min(bottomLeft, bottomRight)))
+                    );
+
+    // Fixed contrast value (tuned for high temporal blur scenarios).
+    float contrast   = 0.9;
+    float sharpAmount= saturate(maxBox.a);  // Sharpness factor based on alpha (as a proxy for weight).
+
+    // Calculate cross weights similarly to AMD CAS.
+    float4 crossWeight = -rcp(rsqrt(saturate(min(minBox, 1.0 - maxBox) * rcp(maxBox))) *
+                              (-3.0 * contrast + 8.0));
+
+    // Compute reciprocal weight factor based on the sum of the cross weights.
+    float4 rcpWeight = rcp(4.0 * crossWeight + 1.0);
+    
+    // Sum the direct neighbors (top, bottom, left, right).
+    float4 crossSumm = top + bottom + left + right;
+    
+    // Combine center pixel with weighted neighbors.
+    return lerp(center, saturate((crossSumm * crossWeight + center) * rcpWeight), sharpAmount);
+
+}
+
+
+/*=============================================================================
+    Shader Technique: TFAA
+=============================================================================*/
+
+/**
+ * @brief Temporal Filter Anti-Aliasing Technique.
+ *
+ * The technique is composed of the following passes:
+ *   - PassSavePre: Saves the current frame's color and depth.
+ *   - PassTemporalFilter: Applies temporal filtering using history and motion vectors.
+ *   - PassSavePost: Stores the exponential color buffer and depth for history.
+ *   - PassShow: Outputs the final image with adaptive sharpening.
+ */
 technique TFAA
+<
+    ui_label = "TFAA";
+    ui_tooltip = "- Temporal Filter Anti-Aliasing -\nTemporal component of TAA to be used with (after) spatial anti-aliasing techniques.\nRequires motion vectors to be available.";
+>
 {
-	pass SaveCurBuffersPass
-	{
-		VertexShader = PostProcessVS;
-		PixelShader = SaveCurPS;
-		RenderTarget0 = texInCurBackup;
-	}
-	pass TaaPass
-	{
-		VertexShader = PostProcessVS;
-		PixelShader = TaaPass;
-		RenderTarget = texExpColor;
-	}
-	pass SaveResultsPass
-	{
-		VertexShader = PostProcessVS;
-		PixelShader = SaveResultsPS;
-		RenderTarget0 = texExpColorBackup;
-		RenderTarget1 = texDepthBackup;
-	}
-	pass OutPass
-	{
-		VertexShader = PostProcessVS;
-		PixelShader = OutPS;
-	}
+    pass PassSavePre
+    {
+        VertexShader   = PostProcessVS;
+        PixelShader    = SaveCur;
+        RenderTarget   = texInCurBackup;
+    }
+
+    pass PassTemporalFilter
+    {
+        VertexShader   = PostProcessVS;
+        PixelShader    = TemporalFilter;
+        RenderTarget   = texExpColor;
+    }
+
+    pass PassSavePost
+    {
+        VertexShader   = PostProcessVS;
+        PixelShader    = SavePost;
+        RenderTarget0  = texExpColorBackup;
+        RenderTarget1  = texDepthBackup;
+    }
+
+    pass PassShow
+    {
+        VertexShader   = PostProcessVS;
+        PixelShader    = Out;
+    }
 }
