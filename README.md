@@ -17,10 +17,12 @@
   - Finished implementing features present in the UI but did nothing at all in 0.1.
   - Fixed a lot of bugs.
   - Optimized some stuff.
-- 2.0
+- 1.0
   - New shader that is both simpler and more performant than the old one.
   - Removed some features that were never finished or not useful.
   - Made the UI much more user-friendly.
+  - Added comments and docstrings, to make it usable by other devs.
+
 
 # Installation
 - Install the current Reshade build.
