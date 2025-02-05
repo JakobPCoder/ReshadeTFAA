@@ -18,10 +18,12 @@
   - Fixed a lot of bugs.
   - Optimized some stuff.
 - 1.0
-  - New shader that is both simpler and more performant than the old one.
+  - New shader that is both simpler and looks cleaner imo.
+  - Reworked most parts of the code in some way.
   - Removed some features that were never finished or not useful.
   - Made the UI much more user-friendly.
   - Added comments and docstrings, to make it usable by other devs.
+  - This effect is only one file now for convenience.
 
 
 # Installation
