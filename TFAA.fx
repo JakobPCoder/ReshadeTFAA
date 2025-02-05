@@ -7,6 +7,7 @@
 =============================================================================*/
 
 #include "ReShadeUI.fxh"
+#include "ReShade.fxh"
 
 /*=============================================================================
     Preprocessor Settings
@@ -550,7 +551,7 @@ float4 Out(float4 position : SV_Position, float2 texcoord : TEXCOORD ) : SV_Targ
 technique TFAA
 <
     ui_label = "TFAA";
-    ui_tooltip = "- Temporal Filter Anti-Aliasing -\nTemporal component of TAA to be used with (after) spatial anti-aliasing techniques.\nRequires motion vectors to be available.";
+    ui_tooltip = "- Temporal Filter Anti-Aliasing -\nTemporal component of TAA to be used with (after) spatial anti-aliasing techniques.\nRequires motion vectors to be available (LAUNCHPAD.fx).";
 >
 {
     pass PassSavePre

@@ -1,6 +1,6 @@
 # Reshade TFAA
 - This is a work in progress Reshade shader, which acts as an addon to other, non temporal, anti aliasing methods.
-- It requires my [Dense Reshade Motion Estimation Shader (DRME)](https://github.com/JakobPCoder/ReshadeMotionEstimation). You can also use Marty McFly's [motion estiamtion](https://gist.github.com/martymcmodding/69c775f844124ec2c71c37541801c053to) instead.
+- It requires Marty McFly's [LAUNCHPAD.fx](https://github.com/martymcmodding/iMMERSE/blob/main/Shaders/MartysMods_LAUNCHPAD.fx).
 
 # Copyright Notice
  - Temporal Filter Anti Aliasing | TFAA
@@ -17,6 +17,11 @@
   - Finished implementig features present in the UI but did nothing at all in 0.1
   - Fixed a lot of bugs.
   - Optimized some stuff.
+- 2.0
+  - New shader that is both simpler and more performant than the old one.
+  - Removed some features that where never finished or not useful.
+  - Made the UI way more user friendly.
+
 
 # Installation
 - Install current Reshade build
