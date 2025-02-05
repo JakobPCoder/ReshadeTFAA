@@ -1,6 +1,6 @@
 
 # Copyright Notice
- - Temporal Filter Anti Aliasing | [TFAA
+ - Temporal Filter Anti Aliasing | TFAA
  - First published 2022 - Copyright, Jakob Wapenhensch
  - https://creativecommons.org/licenses/by-nc/4.0/
  - https://creativecommons.org/licenses/by-nc/4.0/legalcode
