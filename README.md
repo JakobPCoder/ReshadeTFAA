@@ -24,6 +24,14 @@
   - Made the UI much more user-friendly.
   - Added comments and docstrings, to make it usable by other devs.
   - This effect is only one file now for convenience.
+- 1.1
+  - Reordered blending and clamping to be done in the order they are applied in all sota methods.
+    - This dramatically improves the temporal stability of the effect, but also causes a bit more blur.
+    - Reworked the adaptive sharpening to be adjust more accurately to the temporal blur caused by the filter.
+  - Readded dilated motion vector sampling.
+    - This reduces artifacts around edges on moving objects.
+  - Reduced sampled used in sharpening pass to inhance performance. you should not notice a difference.
+
 
 
 # Installation
