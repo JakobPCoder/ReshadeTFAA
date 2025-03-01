@@ -3,12 +3,20 @@
 - It adds a Temporal filter component similar to the ones found in SMAA (1Tx, Filmic SMAA T2x), TAAU, most otherwise unamed TAA implementations and even FSR2. 
 - It requires Marty McFly's [LAUNCHPAD.fx](https://github.com/martymcmodding/iMMERSE/blob/main/Shaders/MartysMods_LAUNCHPAD.fx).
 
+
 # Copyright Notice
  - Temporal Filter Anti-Aliasing | TFAA
  - First published 2022 - Copyright, Jakob Wapenhensch
  - License File [HERE](LICENSE)
  - https://creativecommons.org/licenses/by-nc/4.0/
  - https://creativecommons.org/licenses/by-nc/4.0/legalcode
+
+# Example Shader Usage
+![](shader_order_example.png)
+
+![](ui.png)
+
+
   
 # Updates
 - 0.1 
@@ -46,4 +54,5 @@
 - Drag everything into your Shaders folder.
 - Do the same for https://github.com/martymcmodding/iMMERSE/blob/main/Shaders/MartysMods_LAUNCHPAD.fx.
 - Order in Reshade should be ANTIALIASING (SMAA or! CMAA2 or! FXAA) -> LAUNCHPAD -> Any GI/AO/SSR Shaders -> TFAA -> COLOR CORRECTION -> ANYTHING ELSE
+
 
