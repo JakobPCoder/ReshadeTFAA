@@ -51,8 +51,10 @@
 
 # Installation
 - Install the current Reshade build.
-- Drag everything into your Shaders folder.
-- Do the same for https://github.com/martymcmodding/iMMERSE/blob/main/Shaders/MartysMods_LAUNCHPAD.fx.
+- Drag the TFAA.fx file into your reshade-shaders/Shaders folder.
+- Install https://github.com/martymcmodding/iMMERSE/blob/main/Shaders/MartysMods_LAUNCHPAD.fx.
+- Ingame make sure the **depth buffer** is detected correctly by using the DisplayDepth.fx.
+- Set the global preprocessor sttings for the depth buffer to match the ones in DisplayDepth.fx.
 - Order in Reshade should be ANTIALIASING (SMAA or! CMAA2 or! FXAA) -> LAUNCHPAD -> Any GI/AO/SSR Shaders -> TFAA -> COLOR CORRECTION -> ANYTHING ELSE
 
 
