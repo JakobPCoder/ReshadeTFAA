@@ -34,7 +34,6 @@
   - Reduced samples used in the sharpening pass to enhance performance; you should not notice a difference.
 - 1.1.1
   - Reworked the adaptive sharpening and blending weight calculation to use less magic numbers and be more intuitive and look cleaner.
-  - Added code that will later be used to add variance clipping.
   - Removed UI elements that were accidentally left in the shader.
 - 1.1.2
   - Optimized performance. Now ~ 0.4ms in 4k on a RTX 2070. Before it was ~ 0.6ms.
