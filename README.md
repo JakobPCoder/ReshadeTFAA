@@ -1,5 +1,6 @@
 # Reshade TFAA
 - This is a work in progress Reshade shader, which acts as an addon to other, non-temporal anti-aliasing methods.
+- It adds a Temporal filter component similar to the ones found in SMAA (1Tx, Filmic SMAA T2x), TAAU, most otherwise unamed TAA implementations and even FSR2. 
 - It requires Marty McFly's [LAUNCHPAD.fx](https://github.com/martymcmodding/iMMERSE/blob/main/Shaders/MartysMods_LAUNCHPAD.fx).
 
 # Copyright Notice
@@ -31,10 +32,19 @@
   - Readded dilated motion vector sampling.
     - This reduces artifacts around edges on moving objects.
   - Reduced samples used in the sharpening pass to enhance performance; you should not notice a difference.
+- 1.1.1
+  - Reworked the adaptive sharpening and blending weight calculation to use less magic numbers and be more intuitive and look cleaner.
+  - Added code that will later be used to add variance clipping.
+  - Removed UI elements that were accidentally left in the shader.
+- 1.1.2
+  - Optimized performance. Now ~ 0.4ms in 4k on a RTX 2070. Before it was ~ 0.6ms.
+  - Simplified some of the code to make future updates easier.
+  - Fixed some bugs.
+
 
 # Installation
 - Install the current Reshade build.
 - Drag everything into your Shaders folder.
 - Do the same for https://github.com/martymcmodding/iMMERSE/blob/main/Shaders/MartysMods_LAUNCHPAD.fx.
-- Order in Reshade should be LAUNCHPAD -> (SMAA or! CMAA2 or! FXAA) ->  TFAA -> EVERYTHING ELSE
+- Order in Reshade should be ANTIALIASING (SMAA or! CMAA2 or! FXAA) -> LAUNCHPAD -> Any GI/AO/SSR Shaders -> TFAA -> COLOR CORRECTION -> ANYTHING ELSE
 
