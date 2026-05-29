@@ -1,3 +1,5 @@
+OUTDATED! Use this instead: https://github.com/JakobPCoder/Reshade-Shades
+
 # Reshade TFAA
 - This is a work in progress Reshade shader, which acts as an addon to other, non-temporal anti-aliasing methods.
 - It adds a Temporal filter component similar to the ones found in SMAA (1Tx, Filmic SMAA T2x), TAAU, most otherwise unamed TAA implementations and even FSR2. 
